@@ -2,7 +2,30 @@
 .env
 .tripgo/
 
-# Сборка
+
 bin/
 
 .DS_Store
+
+
+# Собранные бинарники
+/template
+/template.exe
+*.exe
+*.test
+*.out
+
+
+.env
+.env.*
+!.env.example
+*.local
+
+
+.idea/
+.vscode/
+*.swp
+
+Thumbs.db
+*.log
+/tmp/
