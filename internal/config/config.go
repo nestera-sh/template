@@ -21,11 +21,16 @@ type Config struct {
 
 func Load() (*Config, error) {
 	cfg := &Config{
-		HTTPAddr:        getEnv("HTTP_ADDR", ":8080"),
-		ShutdownTimeout: getEnvDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
-		LogLevel:        getEnv("LOG_LEVEL", "info"),
-		DatabaseURL:     os.Getenv("DATABASE_URL"),
+		HTTPAddr:    getEnv("HTTP_ADDR", ":8080"),
+		LogLevel:    getEnv("LOG_LEVEL", "info"),
+		DatabaseURL: os.Getenv("DATABASE_URL"),
 	}
+
+	shutdownTimeout, err := getEnvDuration("SHUTDOWN_TIMEOUT", 10*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	cfg.ShutdownTimeout = shutdownTimeout
 
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")
@@ -63,8 +68,6 @@ func Load() (*Config, error) {
 
 	return cfg, nil
 }
-
-
 
 func getEnv(key, defaultValue string) string {
 	value := os.Getenv(key)
