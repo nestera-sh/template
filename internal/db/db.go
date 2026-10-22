@@ -3,18 +3,39 @@ package db
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func New(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
-	pool, err := pgxpool.New(ctx, dsn)
+func New(
+	ctx context.Context,
+	dsn string,
+	maxConns int,
+	minConns int,
+	connectTimeout time.Duration,
+	maxConnLifetime time.Duration,
+) (*pgxpool.Pool, error) {
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("parse dsn: %w", err)
+	}
+
+	cfg.MaxConns = int32(maxConns)
+	cfg.MinConns = int32(minConns)
+	cfg.MaxConnLifetime = maxConnLifetime
+
+	cfg.ConnConfig.ConnectTimeout = connectTimeout
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("create pool: %w", err)
 	}
 
-	//база база йоу ответьте
-	if err := pool.Ping(ctx); err != nil {
+	pingCtx, cancel := context.WithTimeout(ctx, connectTimeout)
+	defer cancel()
+
+	if err := pool.Ping(pingCtx); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("ping db: %w", err)
 	}

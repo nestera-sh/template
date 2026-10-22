@@ -30,7 +30,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	pool, err := db.New(context.Background(), cfg.DatabaseURL)
+	pool, err := db.New(
+		context.Background(),
+		cfg.DatabaseURL,
+		cfg.DatabaseMaxConns,
+		cfg.DatabaseMinConns,
+		cfg.DatabaseConnectTimeout,
+		cfg.DatabaseMaxConnLifetime,
+	)
 	if err != nil {
 		slog.Error("connect to db", "err", err)
 		os.Exit(1)

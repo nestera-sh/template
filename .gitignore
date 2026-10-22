@@ -29,3 +29,6 @@ bin/
 Thumbs.db
 *.log
 /tmp/
+
+.venv/
+venv/
