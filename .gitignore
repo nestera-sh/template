@@ -32,3 +32,6 @@ Thumbs.db
 
 .venv/
 venv/
+
+trip.json
+trip2.json

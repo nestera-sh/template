@@ -17,12 +17,12 @@ import (
 	"github.com/nestera-sh/template/internal/db"
 	api "github.com/nestera-sh/template/internal/generated"
 	"github.com/nestera-sh/template/internal/handler"
+	"github.com/nestera-sh/template/internal/repository"
+	"github.com/nestera-sh/template/internal/txmanager"
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		slog.Warn("no .env file found", "err", err)
-	}
+	_ = godotenv.Load()
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -44,11 +44,21 @@ func main() {
 	}
 	defer pool.Close()
 
+	tripRepo := repository.NewTripRepository(pool)
+	historyRepo := repository.NewHistoryRepository(pool)
+	txManager := txmanager.New(pool)
+	tripHandler := handler.NewTripHandler(tripRepo, historyRepo, txManager, cfg.DatabaseQueryTimeout)
+
+	mux := chi.NewRouter()
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	mux := chi.NewRouter()
-	api.HandlerFromMux(&tripServer{pool: pool}, mux)
+	api.HandlerWithOptions(&tripServer{handler: tripHandler, pool: pool}, api.ChiServerOptions{
+		BaseRouter: mux,
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			handler.RespondInvalidParam(w, r, err)
+		},
+	})
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -82,7 +92,8 @@ func main() {
 
 type tripServer struct {
 	api.Unimplemented
-	pool *pgxpool.Pool
+	handler *handler.TripHandler
+	pool    *pgxpool.Pool
 }
 
 func (s *tripServer) Health(w http.ResponseWriter, r *http.Request) {
@@ -91,4 +102,16 @@ func (s *tripServer) Health(w http.ResponseWriter, r *http.Request) {
 
 func (s *tripServer) Ready(w http.ResponseWriter, r *http.Request) {
 	handler.Ready(w, r, s.pool)
+}
+
+func (s *tripServer) CreateTrip(w http.ResponseWriter, r *http.Request, params api.CreateTripParams) {
+	s.handler.CreateTrip(w, r, params)
+}
+
+func (s *tripServer) GetTrip(w http.ResponseWriter, r *http.Request, tripID api.TripId) {
+	s.handler.GetTrip(w, r, tripID)
+}
+
+func (s *tripServer) FinishTrip(w http.ResponseWriter, r *http.Request, tripID api.TripId) {
+	s.handler.FinishTrip(w, r, tripID)
 }

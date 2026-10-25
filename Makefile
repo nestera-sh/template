@@ -10,7 +10,7 @@ migrate-down:
 	go tool goose -dir migrations postgres "$(DATABASE_URL)" down
 
 run:
-	go run ./cmd/trip-service
+	-go run ./cmd/trip-service
 
 generate:
 	mkdir -p internal/generated

@@ -15,12 +15,12 @@ func Health(w http.ResponseWriter, r *http.Request) {
 }
 
 func Ready(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	contex, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
 	w.Header().Set("Content-Type", "application/json")
 
-	if err := pool.Ping(ctx); err != nil {
+	if err := pool.Ping(contex); err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = w.Write([]byte(`{"status":"unavailable"}`))
 		return

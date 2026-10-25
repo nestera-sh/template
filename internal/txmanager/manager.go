@@ -28,30 +28,19 @@ func (m *TxManager) Do(ctx context.Context, fn func(ctx context.Context) error) 
 		return fn(ctx)
 	}
 
-	tx, err := m.pool.BeginTx(ctx, pgx.TxOptions{
-		IsoLevel: pgx.ReadCommitted,
-	})
+	tx, err := m.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
+	defer tx.Rollback(ctx)
 
-	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback(ctx)
-			panic(p)
-		}
-	}()
+	ctx = context.WithValue(ctx, ctxKey{}, tx)
 
-	ctxWithTx := context.WithValue(ctx, ctxKey{}, tx)
-
-	if err := fn(ctxWithTx); err != nil {
-		_ = tx.Rollback(ctx)
+	if err := fn(ctx); err != nil {
 		return err
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit tx: %w", err)
-	}
-
-	return nil
+	return tx.Commit(ctx)
 }
+
+//тардис
