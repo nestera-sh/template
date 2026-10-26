@@ -1,4 +1,4 @@
-package txmanager
+package transaction
 
 import (
 	"context"
@@ -10,21 +10,21 @@ import (
 
 type ctxKey struct{}
 
-func TxFromContext(ctx context.Context) (pgx.Tx, bool) {
+func FromContext(ctx context.Context) (pgx.Tx, bool) {
 	tx, ok := ctx.Value(ctxKey{}).(pgx.Tx)
 	return tx, ok
 }
 
-type TxManager struct {
+type Manager struct {
 	pool *pgxpool.Pool
 }
 
-func New(pool *pgxpool.Pool) *TxManager {
-	return &TxManager{pool: pool}
+func NewManager(pool *pgxpool.Pool) *Manager {
+	return &Manager{pool: pool}
 }
 
-func (m *TxManager) Do(ctx context.Context, fn func(ctx context.Context) error) error {
-	if _, ok := TxFromContext(ctx); ok {
+func (m *Manager) Do(ctx context.Context, fn func(ctx context.Context) error) error {
+	if _, ok := FromContext(ctx); ok {
 		return fn(ctx)
 	}
 
@@ -42,5 +42,3 @@ func (m *TxManager) Do(ctx context.Context, fn func(ctx context.Context) error) 
 
 	return tx.Commit(ctx)
 }
-
-//тардис
