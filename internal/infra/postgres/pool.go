@@ -1,4 +1,4 @@
-package db
+package postgres
 
 import (
 	"context"
@@ -24,20 +24,17 @@ func New(
 	cfg.MaxConns = int32(maxConnections)
 	cfg.MinConns = int32(minConnections)
 	cfg.MaxConnLifetime = maxConnLifetime
-
 	cfg.ConnConfig.ConnectTimeout = connectTimeout
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("create pool: %w", err)
-
 	}
 
 	pingCtx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 
 	if err := pool.Ping(pingCtx); err != nil {
-
 		pool.Close()
 		return nil, fmt.Errorf("ping db: %w", err)
 	}
