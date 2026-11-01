@@ -9,7 +9,7 @@ import (
 type (
 	tripRepository interface {
 		Save(ctx context.Context, t *model.Trip) error
-		SaveHistory(ctx context.Context, tripID string, fromStatus, toStatus string) error
+		SaveHistory(ctx context.Context, tripID, fromStatus, toStatus string) error
 	}
 
 	txManager interface {

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/nestera-sh/template/internal/domain/trip"
 	"github.com/nestera-sh/template/internal/infra/postgres/transaction"
 	"github.com/nestera-sh/template/internal/model"
@@ -68,7 +69,8 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*model.Trip, error
 	sql, args, err := squirrel.Select(
 		"id", "user_id", "driver_id", "start_latitude", "start_longitude",
 		"end_latitude", "end_longitude", "price", "status", "started_at", "finished_at",
-		"last_position_at", "created_at", "updated_at").
+		"last_position_at", "created_at", "updated_at",
+	).
 		From("trips").Where(squirrel.Eq{"id": uid}).PlaceholderFormat(squirrel.Dollar).ToSql()
 	if err != nil {
 		return nil, fmt.Errorf("build select: %w", err)
@@ -89,7 +91,7 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*model.Trip, error
 	return &t, nil
 }
 
-func (r *Repository) SaveHistory(ctx context.Context, tripID string, fromStatus, toStatus string) error {
+func (r *Repository) SaveHistory(ctx context.Context, tripID, fromStatus, toStatus string) error {
 	q := r.getQuerier(ctx)
 
 	var from any

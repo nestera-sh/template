@@ -7,14 +7,16 @@ import (
 	"time"
 )
 
+const statusKey = "status"
+
 type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
-func Health(w http.ResponseWriter, r *http.Request) {
+func Health(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	_ = json.NewEncoder(w).Encode(map[string]string{statusKey: "ok"})
 }
 
 func Ready(w http.ResponseWriter, r *http.Request, db Pinger) {
@@ -25,10 +27,10 @@ func Ready(w http.ResponseWriter, r *http.Request, db Pinger) {
 
 	if err := db.Ping(ctx); err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "unavailable"})
+		_ = json.NewEncoder(w).Encode(map[string]string{statusKey: "unavailable"})
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	_ = json.NewEncoder(w).Encode(map[string]string{statusKey: "ok"})
 }

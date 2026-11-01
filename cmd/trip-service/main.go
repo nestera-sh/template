@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
+
 	"github.com/nestera-sh/template/internal/config"
 	"github.com/nestera-sh/template/internal/container"
 	api "github.com/nestera-sh/template/internal/generated"

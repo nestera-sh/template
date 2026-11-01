@@ -32,7 +32,9 @@ func (m *Manager) Do(ctx context.Context, fn func(ctx context.Context) error) er
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	ctx = context.WithValue(ctx, ctxKey{}, tx)
 

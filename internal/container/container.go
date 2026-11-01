@@ -2,6 +2,7 @@ package container
 
 import (
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/nestera-sh/template/internal/config"
 	"github.com/nestera-sh/template/internal/infra/postgres/transaction"
 	"github.com/nestera-sh/template/internal/repository/trip"
@@ -16,8 +17,7 @@ type Container struct {
 	FinishTrip *finishUC.UseCase
 }
 
-func New(pool *pgxpool.Pool, cfg *config.Config) *Container {
-
+func New(pool *pgxpool.Pool, _ *config.Config) *Container {
 	txManager := transaction.NewManager(pool)
 
 	tripRepo := trip.NewRepository(pool)

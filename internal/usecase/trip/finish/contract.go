@@ -9,7 +9,7 @@ import (
 type (
 	tripRepository interface {
 		GetByID(ctx context.Context, id string) (*model.Trip, error)
-		SaveHistory(ctx context.Context, tripID string, fromStatus, toStatus string) error
+		SaveHistory(ctx context.Context, tripID, fromStatus, toStatus string) error
 		Finish(ctx context.Context, id string) error
 	}
 
