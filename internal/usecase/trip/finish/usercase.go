@@ -45,7 +45,6 @@ func (u *UseCase) Execute(ctx context.Context, id string) (*model.Trip, error) {
 		finishedTrip = t
 		return nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("finish trip: %w", err)
 	}

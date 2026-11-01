@@ -21,8 +21,8 @@ func New(
 		return nil, fmt.Errorf("parse dsn: %w", err)
 	}
 
-	cfg.MaxConns = int32(maxConnections)
-	cfg.MinConns = int32(minConnections)
+	cfg.MaxConns = int32(maxConnections) //nolint:gosec
+	cfg.MinConns = int32(minConnections) //nolint:gosec // переполнения не будет, потому что размер пула не модет превысить int32
 	cfg.MaxConnLifetime = maxConnLifetime
 	cfg.ConnConfig.ConnectTimeout = connectTimeout
 

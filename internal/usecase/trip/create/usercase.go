@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/nestera-sh/template/internal/model"
 )
 
@@ -51,7 +52,6 @@ func (u *UseCase) Execute(ctx context.Context, input CreateTripInput) (*model.Tr
 		}
 		return u.tripRepo.SaveHistory(ctx, t.ID.String(), "", string(model.TripStatusActive))
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("create trip: %w", err)
 	}

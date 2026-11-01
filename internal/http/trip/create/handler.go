@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+
 	api "github.com/nestera-sh/template/internal/generated"
 	"github.com/nestera-sh/template/internal/http/domainerror"
 	"github.com/nestera-sh/template/internal/model"
@@ -40,7 +41,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		EndLongitude:   req.EndPoint.Longitude,
 		Price:          req.Price,
 	})
-
 	if err != nil {
 		status, prob := domainerror.Problem(err)
 		w.Header().Set("Content-Type", "application/problem+json")
