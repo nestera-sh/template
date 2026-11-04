@@ -16,4 +16,4 @@ func Finish(t *model.Trip, at time.Time) error {
 	return nil
 }
 
-//тардис
+// тардис

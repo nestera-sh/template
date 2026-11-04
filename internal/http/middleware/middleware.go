@@ -26,7 +26,6 @@ func Recover(next http.Handler) http.Handler {
 func Tracing(next http.Handler) http.Handler {
 	return otelhttp.NewHandler(next, "http.server.request",
 		otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
-
 			routePattern := chi.RouteContext(r.Context()).RoutePattern()
 			if routePattern == "" {
 				routePattern = r.URL.Path
