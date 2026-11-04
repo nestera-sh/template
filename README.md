@@ -68,8 +68,8 @@ curl -i localhost:8080/ready
 |---|---|
 | `internal/domain` | Бизнес-правила (например, `trip.Finish`). Не зависит от HTTP, БД и OTel. |
 | `internal/usecase` | Сценарии (создать, получить, завершить). Зависит только от домена и интерфейсов. |
-| `internal/http` | Транспорт: хендлеры и middleware. Зависит от юзкейсов. |
-| `internal/repository` | Работа с БД (`pgx` + `squirrel`). Зависит от домена. |
+| `internal/http` | хендлеры и middleware. Зависит от юзкейсов. |
+| `internal/repository` | Работа с БД (`pgx` и `squirrel`). Зависит от домена. |
 | `internal/infra` | Инфраструктура: БД, OTel, транзакции. |
 | `internal/container` | Composition root — сборка всех зависимостей. |
 
@@ -89,7 +89,7 @@ make test
 
 ### Интеграционные тесты
 
-Для запуска интеграционных тестов с реальной PostgreSQL:
+Для запуска интеграционных тестов с PostgreSQL:
 
 ```bash
 tripgoctl environment start
@@ -109,10 +109,10 @@ make test-integration
 
 - Код переложен по слоям (`domain`, `usecase`, `http`, `repository`, `infra`).
 - Внешние зависимости скрыты за интерфейсами, объявленными в `contract.go` у потребителей.
-- Настроен `.golangci.yml`: все 18 линтеров из задания, включая `depguard` для проверки слоев.
-- `make lint` выдает **0 issues**.
+- Настроен `.golangci.yml` со всеми линтерами.
+- `make lint` выдает 0 issues.
 - Написаны unit-тесты (домен, юзкейсы, хендлеры, маппинг ошибок) и интеграционные тесты (репозиторий).
-- Покрытие `usecase` и `domain` — выше 50% (фактически 89–100%).
+- Покрытие `usecase` и `domain` - ок. 80-90%.
 - Подключен OpenTelemetry:
   - трейсы (HTTP и БД через `otelpgx`);
   - метрики (`http.server.request.duration`, `tripgo.trips.created` и др.);

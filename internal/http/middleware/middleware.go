@@ -9,6 +9,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func Recover(next http.Handler) http.Handler {
@@ -43,6 +46,12 @@ func Logging(next http.Handler) http.Handler {
 		next.ServeHTTP(ww, r)
 
 		duration := time.Since(start)
+
+		span := trace.SpanFromContext(r.Context())
+		if ww.Status() >= 400 {
+			span.SetStatus(codes.Error, http.StatusText(ww.Status()))
+			span.SetAttributes(attribute.String("error.type", http.StatusText(ww.Status())))
+		}
 
 		slog.Info("request handled",
 			"method", r.Method,
