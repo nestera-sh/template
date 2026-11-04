@@ -18,10 +18,12 @@ import (
 	"github.com/nestera-sh/template/internal/container"
 	api "github.com/nestera-sh/template/internal/generated"
 	httpHealth "github.com/nestera-sh/template/internal/http"
+	appMiddleware "github.com/nestera-sh/template/internal/http/middleware"
 	createHandler "github.com/nestera-sh/template/internal/http/trip/create"
 	finishHandler "github.com/nestera-sh/template/internal/http/trip/finish"
 	getHandler "github.com/nestera-sh/template/internal/http/trip/get"
 	"github.com/nestera-sh/template/internal/infra/postgres"
+	"github.com/nestera-sh/template/internal/infra/telemetry"
 )
 
 func main() {
@@ -32,6 +34,15 @@ func main() {
 		slog.Error("load config", "err", err)
 		os.Exit(1)
 	}
+
+	shutdownTelemetry, err := telemetry.Init(context.Background(), cfg.LogLevel)
+	if err != nil {
+		slog.Error("init telemetry", "err", err)
+		os.Exit(1)
+	}
+	defer func() {
+		_ = shutdownTelemetry(context.Background())
+	}()
 
 	pool, err := postgres.New(
 		context.Background(),
@@ -54,6 +65,10 @@ func main() {
 	finishH := finishHandler.New(cnt.FinishTrip)
 
 	mux := chi.NewRouter()
+
+	mux.Use(appMiddleware.Recover)
+	mux.Use(appMiddleware.Tracing)
+	mux.Use(appMiddleware.Logging)
 	mux.Get("/health", httpHealth.Health)
 	mux.Get("/ready", func(w http.ResponseWriter, r *http.Request) { httpHealth.Ready(w, r, pool) })
 
@@ -110,8 +125,6 @@ func main() {
 	slog.Info("server stopped")
 }
 
-// strPtr — вспомогательная функция, чтобы получить указатель на строку.
-// Нужна для заполнения полей Detail и Instance в api.Problem.
 func strPtr(s string) *string { return &s }
 
 type tripServer struct {

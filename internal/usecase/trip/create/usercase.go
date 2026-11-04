@@ -23,12 +23,14 @@ type CreateTripInput struct {
 type UseCase struct {
 	tripRepo tripRepository
 	txMgr    txManager
+	metrics  metrics
 }
 
-func New(tripRepo tripRepository, txMgr txManager) *UseCase {
+func New(tripRepo tripRepository, txMgr txManager, metrics metrics) *UseCase {
 	return &UseCase{
 		tripRepo: tripRepo,
 		txMgr:    txMgr,
+		metrics:  metrics,
 	}
 }
 
@@ -54,6 +56,10 @@ func (u *UseCase) Execute(ctx context.Context, input CreateTripInput) (*model.Tr
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create trip: %w", err)
+	}
+
+	if u.metrics != nil {
+		u.metrics.IncTripsCreated(ctx)
 	}
 
 	return t, nil

@@ -12,12 +12,14 @@ import (
 type UseCase struct {
 	tripRepo tripRepository
 	txMgr    txManager
+	metrics  metrics
 }
 
-func New(tripRepo tripRepository, txMgr txManager) *UseCase {
+func New(tripRepo tripRepository, txMgr txManager, metrics metrics) *UseCase {
 	return &UseCase{
 		tripRepo: tripRepo,
 		txMgr:    txMgr,
+		metrics:  metrics,
 	}
 }
 
@@ -47,6 +49,10 @@ func (u *UseCase) Execute(ctx context.Context, id string) (*model.Trip, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("finish trip: %w", err)
+	}
+
+	if u.metrics != nil {
+		u.metrics.IncTripsCompleted(ctx)
 	}
 
 	return finishedTrip, nil
