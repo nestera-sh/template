@@ -54,7 +54,7 @@ func main() {
 	)
 	if err != nil {
 		slog.Error("connect to db", "err", err)
-		os.Exit(1)
+		return
 	}
 	defer pool.Close()
 
@@ -65,10 +65,10 @@ func main() {
 	finishH := finishHandler.New(cnt.FinishTrip)
 
 	mux := chi.NewRouter()
-
 	mux.Use(appMiddleware.Recover)
 	mux.Use(appMiddleware.Tracing)
 	mux.Use(appMiddleware.Logging)
+
 	mux.Get("/health", httpHealth.Health)
 	mux.Get("/ready", func(w http.ResponseWriter, r *http.Request) { httpHealth.Ready(w, r, pool) })
 
@@ -102,19 +102,24 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
+	serverErr := make(chan error, 1)
 	go func() {
 		slog.Info("starting server", "addr", cfg.HTTPAddr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("server failed", "err", err)
-			os.Exit(1)
+			serverErr <- err
 		}
 	}()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	<-ctx.Done()
 
-	slog.Info("shutting down...")
+	select {
+	case err := <-serverErr:
+		slog.Error("server failed", "err", err)
+	case <-ctx.Done():
+		slog.Info("shutting down...")
+	}
+
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 
