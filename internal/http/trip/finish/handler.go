@@ -1,20 +1,26 @@
 package finish
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	api "github.com/nestera-sh/template/internal/generated"
 	"github.com/nestera-sh/template/internal/http/domainerror"
 	"github.com/nestera-sh/template/internal/model"
-	finishUC "github.com/nestera-sh/template/internal/usecase/trip/finish"
 )
 
-type Handler struct {
-	uc *finishUC.UseCase
+//go:generate mockgen -source=handler.go -destination=mocks_test.go -package=finish_test
+
+type useCase interface {
+	Execute(ctx context.Context, id string) (*model.Trip, error)
 }
 
-func New(uc *finishUC.UseCase) *Handler {
+type Handler struct {
+	uc useCase
+}
+
+func New(uc useCase) *Handler {
 	return &Handler{uc: uc}
 }
 

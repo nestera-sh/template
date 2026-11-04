@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/exaring/otelpgx"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,6 +21,7 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("parse dsn: %w", err)
 	}
+	cfg.ConnConfig.Tracer = otelpgx.NewTracer()
 
 	cfg.MaxConns = int32(maxConnections) //nolint:gosec
 	cfg.MinConns = int32(minConnections) //nolint:gosec // переполнения не будет, потому что размер пула не модет превысить int32

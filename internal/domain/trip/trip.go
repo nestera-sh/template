@@ -15,3 +15,5 @@ func Finish(t *model.Trip, at time.Time) error {
 	t.FinishedAt = &at
 	return nil
 }
+
+//тардис

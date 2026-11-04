@@ -1,6 +1,7 @@
 package create
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -12,11 +13,17 @@ import (
 	"github.com/nestera-sh/template/internal/usecase/trip/create"
 )
 
-type Handler struct {
-	uc *create.UseCase
+//go:generate mockgen -source=handler.go -destination=mocks_test.go -package=create_test
+
+type useCase interface {
+	Execute(ctx context.Context, input create.CreateTripInput) (*model.Trip, error)
 }
 
-func New(uc *create.UseCase) *Handler {
+type Handler struct {
+	uc useCase
+}
+
+func New(uc useCase) *Handler {
 	return &Handler{uc: uc}
 }
 

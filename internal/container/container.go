@@ -5,6 +5,7 @@ import (
 
 	"github.com/nestera-sh/template/internal/config"
 	"github.com/nestera-sh/template/internal/infra/postgres/transaction"
+	"github.com/nestera-sh/template/internal/infra/telemetry"
 	"github.com/nestera-sh/template/internal/repository/trip"
 	createUC "github.com/nestera-sh/template/internal/usecase/trip/create"
 	finishUC "github.com/nestera-sh/template/internal/usecase/trip/finish"
@@ -19,12 +20,13 @@ type Container struct {
 
 func New(pool *pgxpool.Pool, _ *config.Config) *Container {
 	txManager := transaction.NewManager(pool)
-
 	tripRepo := trip.NewRepository(pool)
 
-	createUc := createUC.New(tripRepo, txManager)
+	metrics, _ := telemetry.NewMetrics()
+
+	createUc := createUC.New(tripRepo, txManager, metrics)
 	getUc := getUC.New(tripRepo)
-	finishUc := finishUC.New(tripRepo, txManager)
+	finishUc := finishUC.New(tripRepo, txManager, metrics)
 
 	return &Container{
 		CreateTrip: createUc,
