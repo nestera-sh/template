@@ -18,12 +18,12 @@ import (
 )
 
 func TestHandler_ServeHTTP(t *testing.T) {
-	validBody := api.TripData{
-		UserId:     [16]byte{1},
-		DriverId:   [16]byte{2},
-		StartPoint: api.Coordinates{Latitude: 10, Longitude: 20},
-		EndPoint:   api.Coordinates{Latitude: 30, Longitude: 40},
-		Price:      1000,
+	validBody := map[string]interface{}{
+		"user_id":     "11111111-1111-1111-1111-111111111111",
+		"driver_id":   "22222222-2222-2222-2222-222222222222",
+		"start_point": map[string]float64{"latitude": 10, "longitude": 20},
+		"end_point":   map[string]float64{"latitude": 30, "longitude": 40},
+		"price":       1000,
 	}
 
 	tests := []struct {
@@ -47,6 +47,28 @@ func TestHandler_ServeHTTP(t *testing.T) {
 			wantStatus: http.StatusBadRequest,
 		},
 		{
+			name: "missing required field (price)",
+			body: map[string]interface{}{
+				"user_id":     "11111111-1111-1111-1111-111111111111",
+				"driver_id":   "22222222-2222-2222-2222-222222222222",
+				"start_point": map[string]float64{"latitude": 10, "longitude": 20},
+				"end_point":   map[string]float64{"latitude": 30, "longitude": 40},
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "unknown field",
+			body: map[string]interface{}{
+				"user_id":     "11111111-1111-1111-1111-111111111111",
+				"driver_id":   "22222222-2222-2222-2222-222222222222",
+				"start_point": map[string]float64{"latitude": 10, "longitude": 20},
+				"end_point":   map[string]float64{"latitude": 30, "longitude": 40},
+				"price":       1000,
+				"unknown":     "field",
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
 			name:            "driver busy",
 			body:            validBody,
 			mockErr:         trip.ErrDriverBusy,
@@ -62,7 +84,7 @@ func TestHandler_ServeHTTP(t *testing.T) {
 
 			mockUC := NewMockuseCase(ctrl)
 
-			if tt.wantStatus != http.StatusBadRequest {
+			if tt.wantStatus == http.StatusCreated || tt.wantStatus == http.StatusConflict {
 				mockUC.EXPECT().
 					Execute(gomock.Any(), gomock.Any()).
 					Return(tt.mockTrip, tt.mockErr).
