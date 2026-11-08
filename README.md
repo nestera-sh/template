@@ -90,4 +90,6 @@ CREATE UNIQUE INDEX trips_one_active_per_driver_idx ON trips(driver_id) WHERE st
 
 **4. Обработка ошибок**
 
+
 Все ошибки возвращаются в формате `application/problem+json`. Ошибки парсинга path-параметров также перехватываются и возвращаются в `problem+json` через кастомный обработчик ошибок `ErrorHandlerFunc`.
+
