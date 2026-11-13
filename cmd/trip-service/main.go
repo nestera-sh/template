@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -11,14 +12,18 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+
 	"github.com/nestera-sh/template/internal/config"
-	"github.com/nestera-sh/template/internal/db"
+	"github.com/nestera-sh/template/internal/container"
 	api "github.com/nestera-sh/template/internal/generated"
-	"github.com/nestera-sh/template/internal/handler"
-	"github.com/nestera-sh/template/internal/repository"
-	"github.com/nestera-sh/template/internal/txmanager"
+	httpHealth "github.com/nestera-sh/template/internal/http"
+	appMiddleware "github.com/nestera-sh/template/internal/http/middleware"
+	createHandler "github.com/nestera-sh/template/internal/http/trip/create"
+	finishHandler "github.com/nestera-sh/template/internal/http/trip/finish"
+	getHandler "github.com/nestera-sh/template/internal/http/trip/get"
+	"github.com/nestera-sh/template/internal/infra/postgres"
+	"github.com/nestera-sh/template/internal/infra/telemetry"
 )
 
 func main() {
@@ -30,7 +35,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	pool, err := db.New(
+	shutdownTelemetry, err := telemetry.Init(context.Background(), cfg.LogLevel)
+	if err != nil {
+		slog.Error("init telemetry", "err", err)
+		os.Exit(1)
+	}
+	defer func() {
+		_ = shutdownTelemetry(context.Background())
+	}()
+
+	pool, err := postgres.New(
 		context.Background(),
 		cfg.DatabaseURL,
 		cfg.DatabaseMaxConns,
@@ -40,23 +54,42 @@ func main() {
 	)
 	if err != nil {
 		slog.Error("connect to db", "err", err)
-		os.Exit(1)
+		return
 	}
 	defer pool.Close()
 
-	tripRepo := repository.NewTripRepository(pool)
-	historyRepo := repository.NewHistoryRepository(pool)
-	txManager := txmanager.New(pool)
-	tripHandler := handler.NewTripHandler(tripRepo, historyRepo, txManager, cfg.DatabaseQueryTimeout)
+	cnt := container.New(pool, cfg)
+
+	createH := createHandler.New(cnt.CreateTrip)
+	getH := getHandler.New(cnt.GetTrip)
+	finishH := finishHandler.New(cnt.FinishTrip)
 
 	mux := chi.NewRouter()
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
+	mux.Use(appMiddleware.Recover)
+	mux.Use(appMiddleware.Tracing)
+	mux.Use(appMiddleware.Logging)
 
-	api.HandlerWithOptions(&tripServer{handler: tripHandler, pool: pool}, api.ChiServerOptions{
+	mux.Get("/health", httpHealth.Health)
+	mux.Get("/ready", func(w http.ResponseWriter, r *http.Request) { httpHealth.Ready(w, r, pool) })
+
+	api.HandlerWithOptions(&tripServer{
+		createH: createH,
+		getH:    getH,
+		finishH: finishH,
+		pool:    pool,
+	}, api.ChiServerOptions{
 		BaseRouter: mux,
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			handler.RespondInvalidParam(w, r, err)
+			w.Header().Set("Content-Type", "application/problem+json")
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(api.Problem{
+				Type:     "https://tripgo.example/problems/invalid-request",
+				Title:    "Invalid request",
+				Status:   http.StatusBadRequest,
+				Code:     "invalid_request",
+				Detail:   strPtr(err.Error()),
+				Instance: strPtr(r.URL.Path),
+			})
 		},
 	})
 
@@ -69,16 +102,23 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
+	serverErr := make(chan error, 1)
 	go func() {
 		slog.Info("starting server", "addr", cfg.HTTPAddr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("server failed", "err", err)
-			os.Exit(1)
+			serverErr <- err
 		}
 	}()
 
-	<-ctx.Done()
-	slog.Info("shutting down...")
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	select {
+	case err := <-serverErr:
+		slog.Error("server failed", "err", err)
+	case <-ctx.Done():
+		slog.Info("shutting down...")
+	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
@@ -90,28 +130,27 @@ func main() {
 	slog.Info("server stopped")
 }
 
+func strPtr(s string) *string { return &s }
+
 type tripServer struct {
 	api.Unimplemented
-	handler *handler.TripHandler
-	pool    *pgxpool.Pool
+	createH *createHandler.Handler
+	getH    *getHandler.Handler
+	finishH *finishHandler.Handler
+	pool    interface{ Ping(context.Context) error }
 }
 
-func (s *tripServer) Health(w http.ResponseWriter, r *http.Request) {
-	handler.Health(w, r)
-}
+func (s *tripServer) Health(w http.ResponseWriter, r *http.Request) { httpHealth.Health(w, r) }
+func (s *tripServer) Ready(w http.ResponseWriter, r *http.Request)  { httpHealth.Ready(w, r, s.pool) }
 
-func (s *tripServer) Ready(w http.ResponseWriter, r *http.Request) {
-	handler.Ready(w, r, s.pool)
-}
-
-func (s *tripServer) CreateTrip(w http.ResponseWriter, r *http.Request, params api.CreateTripParams) {
-	s.handler.CreateTrip(w, r, params)
+func (s *tripServer) CreateTrip(w http.ResponseWriter, r *http.Request, _ api.CreateTripParams) {
+	s.createH.ServeHTTP(w, r)
 }
 
 func (s *tripServer) GetTrip(w http.ResponseWriter, r *http.Request, tripID api.TripId) {
-	s.handler.GetTrip(w, r, tripID)
+	s.getH.ServeHTTP(w, r, tripID.String())
 }
 
 func (s *tripServer) FinishTrip(w http.ResponseWriter, r *http.Request, tripID api.TripId) {
-	s.handler.FinishTrip(w, r, tripID)
+	s.finishH.ServeHTTP(w, r, tripID.String())
 }
