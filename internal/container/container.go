@@ -10,12 +10,16 @@ import (
 	createUC "github.com/nestera-sh/template/internal/usecase/trip/create"
 	finishUC "github.com/nestera-sh/template/internal/usecase/trip/finish"
 	getUC "github.com/nestera-sh/template/internal/usecase/trip/get"
+	getPosUC "github.com/nestera-sh/template/internal/usecase/trip/get_positions"
+	savePosUC "github.com/nestera-sh/template/internal/usecase/trip/save_position"
 )
 
 type Container struct {
-	CreateTrip *createUC.UseCase
-	GetTrip    *getUC.UseCase
-	FinishTrip *finishUC.UseCase
+	CreateTrip   *createUC.UseCase
+	GetTrip      *getUC.UseCase
+	FinishTrip   *finishUC.UseCase
+	SavePosition *savePosUC.UseCase
+	GetPositions *getPosUC.UseCase
 }
 
 func New(pool *pgxpool.Pool, _ *config.Config) *Container {
@@ -27,10 +31,14 @@ func New(pool *pgxpool.Pool, _ *config.Config) *Container {
 	createUc := createUC.New(tripRepo, txManager, metrics)
 	getUc := getUC.New(tripRepo)
 	finishUc := finishUC.New(tripRepo, txManager, metrics)
+	savePosUc := savePosUC.New(tripRepo, txManager)
+	getPosUc := getPosUC.New(tripRepo)
 
 	return &Container{
-		CreateTrip: createUc,
-		GetTrip:    getUc,
-		FinishTrip: finishUc,
+		CreateTrip:   createUc,
+		GetTrip:      getUc,
+		FinishTrip:   finishUc,
+		SavePosition: savePosUc,
+		GetPositions: getPosUc,
 	}
 }

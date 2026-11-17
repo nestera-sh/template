@@ -17,6 +17,14 @@ type Config struct {
 	DatabaseConnectTimeout  time.Duration
 	DatabaseQueryTimeout    time.Duration
 	DatabaseMaxConnLifetime time.Duration
+
+	// Новые поля для работы 3
+	PositionCheckInterval time.Duration
+	PositionStaleAfter    time.Duration
+	PositionWorkers       int
+	PositionQueueSize     int
+	PushHTTPURL           string
+	PushRequestTimeout    time.Duration
 }
 
 func Load() (*Config, error) {
@@ -65,6 +73,14 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	cfg.DatabaseMaxConnLifetime = maxConnLifetime
+
+	// --- Настройки для работы 3 ---
+	cfg.PositionCheckInterval, _ = getEnvDuration("POSITION_CHECK_INTERVAL", 30*time.Second)
+	cfg.PositionStaleAfter, _ = getEnvDuration("POSITION_STALE_AFTER", 60*time.Second)
+	cfg.PositionWorkers, _ = getEnvInt("POSITION_WORKERS", 4)
+	cfg.PositionQueueSize, _ = getEnvInt("POSITION_QUEUE_SIZE", 100)
+	cfg.PushHTTPURL = os.Getenv("PUSH_HTTP_URL")
+	cfg.PushRequestTimeout, _ = getEnvDuration("PUSH_REQUEST_TIMEOUT", 1*time.Second)
 
 	return cfg, nil
 }

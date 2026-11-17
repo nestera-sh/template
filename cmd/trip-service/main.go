@@ -13,6 +13,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
+	getPosHandler "github.com/nestera-sh/template/internal/http/trip/get_positions"
+	savePosHandler "github.com/nestera-sh/template/internal/http/trip/save_position"
 
 	"github.com/nestera-sh/template/internal/config"
 	"github.com/nestera-sh/template/internal/container"
@@ -63,6 +65,8 @@ func main() {
 	createH := createHandler.New(cnt.CreateTrip)
 	getH := getHandler.New(cnt.GetTrip)
 	finishH := finishHandler.New(cnt.FinishTrip)
+	savePosH := savePosHandler.New(cnt.SavePosition)
+	getPosH := getPosHandler.New(cnt.GetPositions)
 
 	mux := chi.NewRouter()
 	mux.Use(appMiddleware.Recover)
@@ -91,6 +95,13 @@ func main() {
 				Instance: strPtr(r.URL.Path),
 			})
 		},
+	})
+
+	mux.Post("/api/v1/trips/{tripId}/positions", func(w http.ResponseWriter, r *http.Request) {
+		savePosH.ServeHTTP(w, r, chi.URLParam(r, "tripId"))
+	})
+	mux.Get("/api/v1/trips/{tripId}/positions", func(w http.ResponseWriter, r *http.Request) {
+		getPosH.ServeHTTP(w, r, chi.URLParam(r, "tripId"))
 	})
 
 	srv := &http.Server{
