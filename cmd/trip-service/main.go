@@ -65,7 +65,7 @@ func main() {
 	createH := createHandler.New(cnt.CreateTrip)
 	getH := getHandler.New(cnt.GetTrip)
 	finishH := finishHandler.New(cnt.FinishTrip)
-	savePosH := savePosHandler.New(cnt.SavePosition)
+	savePosH := savePosHandler.New(cnt.SavePosition, cnt.Scanner.CancelTask)
 	getPosH := getPosHandler.New(cnt.GetPositions)
 
 	mux := chi.NewRouter()
@@ -123,6 +123,8 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	go cnt.Scanner.Start(ctx)
 
 	select {
 	case err := <-serverErr:

@@ -16,11 +16,12 @@ type useCase interface {
 }
 
 type Handler struct {
-	uc useCase
+	uc      useCase
+	onSaved func(tripID string)
 }
 
-func New(uc useCase) *Handler {
-	return &Handler{uc: uc}
+func New(uc useCase, onSaved func(tripID string)) *Handler {
+	return &Handler{uc: uc, onSaved: onSaved}
 }
 
 type savePositionRequest struct {
@@ -69,6 +70,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, tripID strin
 		w.WriteHeader(status)
 		_ = json.NewEncoder(w).Encode(prob)
 		return
+	}
+
+	if h.onSaved != nil {
+		h.onSaved(tripID)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
