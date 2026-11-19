@@ -17,13 +17,24 @@ import (
 	"github.com/nestera-sh/template/internal/model"
 )
 
+const (
+	fieldUserID     = "user_id"
+	fieldDriverID   = "driver_id"
+	fieldLongitude  = "longitude"
+	testUserID      = "11111111-1111-1111-1111-111111111111"
+	testDriverID    = "22222222-2222-2222-2222-222222222222"
+	fieldStartPoint = "start_point"
+	fieldLatitude   = "latitude"
+	fieldEndPoint   = "end_point"
+)
+
 func TestHandler_ServeHTTP(t *testing.T) {
 	validBody := map[string]interface{}{
-		"user_id":     "11111111-1111-1111-1111-111111111111",
-		"driver_id":   "22222222-2222-2222-2222-222222222222",
-		"start_point": map[string]float64{"latitude": 10, "longitude": 20},
-		"end_point":   map[string]float64{"latitude": 30, "longitude": 40},
-		"price":       1000,
+		fieldUserID:     testUserID,
+		fieldDriverID:   testDriverID,
+		fieldStartPoint: map[string]float64{fieldLatitude: 10, fieldLongitude: 20},
+		fieldEndPoint:   map[string]float64{fieldLatitude: 30, fieldLongitude: 40},
+		"price":         1000,
 	}
 
 	tests := []struct {
@@ -49,22 +60,22 @@ func TestHandler_ServeHTTP(t *testing.T) {
 		{
 			name: "missing required field (price)",
 			body: map[string]interface{}{
-				"user_id":     "11111111-1111-1111-1111-111111111111",
-				"driver_id":   "22222222-2222-2222-2222-222222222222",
-				"start_point": map[string]float64{"latitude": 10, "longitude": 20},
-				"end_point":   map[string]float64{"latitude": 30, "longitude": 40},
+				fieldUserID:     testUserID,
+				fieldDriverID:   testDriverID,
+				fieldStartPoint: map[string]float64{fieldLatitude: 10, fieldLongitude: 20},
+				fieldEndPoint:   map[string]float64{fieldLatitude: 30, fieldLongitude: 40},
 			},
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name: "unknown field",
 			body: map[string]interface{}{
-				"user_id":     "11111111-1111-1111-1111-111111111111",
-				"driver_id":   "22222222-2222-2222-2222-222222222222",
-				"start_point": map[string]float64{"latitude": 10, "longitude": 20},
-				"end_point":   map[string]float64{"latitude": 30, "longitude": 40},
-				"price":       1000,
-				"unknown":     "field",
+				fieldUserID:     testUserID,
+				fieldDriverID:   testDriverID,
+				fieldStartPoint: map[string]float64{fieldLatitude: 10, fieldLongitude: 20},
+				fieldEndPoint:   map[string]float64{fieldLatitude: 30, fieldLongitude: 40},
+				"price":         1000,
+				"unknown":       "field",
 			},
 			wantStatus: http.StatusBadRequest,
 		},

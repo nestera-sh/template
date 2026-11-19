@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
@@ -19,7 +20,16 @@ func Recover(next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				slog.Error("panic recovered", "err", err, "stack", string(debug.Stack()))
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				w.Header().Set("Content-Type", "application/problem+json")
+				w.WriteHeader(http.StatusInternalServerError)
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"type":     "https://tripgo.example/problems/internal-error",
+					"title":    "Internal Server Error",
+					"status":   http.StatusInternalServerError,
+					"code":     "internal_error",
+					"detail":   "Internal server error",
+					"instance": r.URL.Path,
+				})
 			}
 		}()
 		next.ServeHTTP(w, r)
