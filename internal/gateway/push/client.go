@@ -4,15 +4,23 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
+
+// ErrPushClient — Push Service ответил 4xx: запрос некорректен, повторять бессмысленно.
+var ErrPushClient = errors.New("push service client error")
+
+// ErrPushServer — Push Service ответил 5xx/429/503: временная проблема, можно повторить.
+var ErrPushServer = errors.New("push service server error")
 
 type Client struct {
 	httpClient *http.Client
@@ -22,11 +30,9 @@ type Client struct {
 
 func NewClient(baseURL string, timeout time.Duration) *Client {
 	return &Client{
-		httpClient: &http.Client{
-			Timeout: timeout,
-		},
-		baseURL: baseURL,
-		tracer:  otel.Tracer("push-gateway"),
+		httpClient: &http.Client{Timeout: timeout},
+		baseURL:    baseURL,
+		tracer:     otel.Tracer("push-gateway"),
 	}
 }
 
@@ -47,12 +53,10 @@ func (c *Client) RequestPosition(ctx context.Context, tripID, driverID string) e
 	defer span.End()
 
 	reqBody := pushRequest{
-		RequestID:   fmt.Sprintf("req-%s", tripID),
+		RequestID:   uuid.New().String(),
 		RecipientID: driverID,
 		Kind:        "REQUEST_POSITION",
-		Data: map[string]string{
-			"trip_id": tripID,
-		},
+		Data:        map[string]string{"trip_id": tripID},
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)
@@ -62,7 +66,7 @@ func (c *Client) RequestPosition(ctx context.Context, tripID, driverID string) e
 		return fmt.Errorf("marshal request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/api/v1/push", c.baseURL)
+	url := c.baseURL + "/api/v1/push"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		span.RecordError(err)
@@ -79,8 +83,19 @@ func (c *Client) RequestPosition(ctx context.Context, tripID, driverID string) e
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
-		err := fmt.Errorf("push service returned status %d", resp.StatusCode)
+	switch {
+	case resp.StatusCode >= 500:
+		err := fmt.Errorf("%w: status %d", ErrPushServer, resp.StatusCode)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
+	case resp.StatusCode == http.StatusTooManyRequests:
+		err := fmt.Errorf("%w: status %d (retry-after=%s)", ErrPushServer, resp.StatusCode, resp.Header.Get("Retry-After"))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
+	case resp.StatusCode >= 400:
+		err := fmt.Errorf("%w: status %d", ErrPushClient, resp.StatusCode)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return err
@@ -89,5 +104,3 @@ func (c *Client) RequestPosition(ctx context.Context, tripID, driverID string) e
 	span.SetStatus(codes.Ok, "")
 	return nil
 }
-
-//тардис

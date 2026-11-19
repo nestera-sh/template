@@ -13,8 +13,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
-	getPosHandler "github.com/nestera-sh/template/internal/http/trip/get_positions"
-	savePosHandler "github.com/nestera-sh/template/internal/http/trip/save_position"
 
 	"github.com/nestera-sh/template/internal/config"
 	"github.com/nestera-sh/template/internal/container"
@@ -24,6 +22,8 @@ import (
 	createHandler "github.com/nestera-sh/template/internal/http/trip/create"
 	finishHandler "github.com/nestera-sh/template/internal/http/trip/finish"
 	getHandler "github.com/nestera-sh/template/internal/http/trip/get"
+	getPosHandler "github.com/nestera-sh/template/internal/http/trip/get_positions"
+	savePosHandler "github.com/nestera-sh/template/internal/http/trip/save_position"
 	"github.com/nestera-sh/template/internal/infra/postgres"
 	"github.com/nestera-sh/template/internal/infra/telemetry"
 )
@@ -121,25 +121,48 @@ func main() {
 		}
 	}()
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	go cnt.Scanner.Start(ctx)
+	// Сканер живёт в своём контексте, чтобы можно было остановить его
+	// ПОСЛЕ HTTP-сервера (порядок из п. 5.7).
+	scannerCtx, stopScanner := context.WithCancel(context.Background())
+	defer stopScanner()
+
+	scannerDone := make(chan struct{})
+	go func() {
+		defer close(scannerDone)
+		cnt.Scanner.Start(scannerCtx, cfg.ShutdownTimeout)
+	}()
 
 	select {
 	case err := <-serverErr:
 		slog.Error("server failed", "err", err)
-	case <-ctx.Done():
+	case <-sigCtx.Done():
 		slog.Info("shutting down...")
 	}
 
+	// 1. Сервер перестаёт принимать запросы и дожидается текущих.
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
-
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("graceful shutdown failed", "err", err)
 		_ = srv.Close()
 	}
+	slog.Info("http server stopped")
+
+	// 2. Останавливаем сканер — новые задачи не появляются.
+	stopScanner()
+
+	// 3. Воркеры дорабатывают очередь (внутри Start с таймаутом).
+	select {
+	case <-scannerDone:
+		slog.Info("scanner stopped")
+	case <-time.After(cfg.ShutdownTimeout):
+		slog.Warn("scanner shutdown timeout exceeded")
+	}
+
+	// 4. pool.Close() уже в defer.
 	slog.Info("server stopped")
 }
 

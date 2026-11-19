@@ -41,6 +41,21 @@ func (m *MocktripRepository) EXPECT() *MocktripRepositoryMockRecorder {
 	return m.recorder
 }
 
+// GetByID mocks base method.
+func (m *MocktripRepository) GetByID(ctx context.Context, id string) (*model.Trip, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByID", ctx, id)
+	ret0, _ := ret[0].(*model.Trip)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByID indicates an expected call of GetByID.
+func (mr *MocktripRepositoryMockRecorder) GetByID(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MocktripRepository)(nil).GetByID), ctx, id)
+}
+
 // SavePosition mocks base method.
 func (m *MocktripRepository) SavePosition(ctx context.Context, p *model.Position) error {
 	m.ctrl.T.Helper()
@@ -91,4 +106,40 @@ func (m *MocktxManager) Do(ctx context.Context, fn func(context.Context) error) 
 func (mr *MocktxManagerMockRecorder) Do(ctx, fn any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Do", reflect.TypeOf((*MocktxManager)(nil).Do), ctx, fn)
+}
+
+// Mockmetrics is a mock of metrics interface.
+type Mockmetrics struct {
+	ctrl     *gomock.Controller
+	recorder *MockmetricsMockRecorder
+	isgomock struct{}
+}
+
+// MockmetricsMockRecorder is the mock recorder for Mockmetrics.
+type MockmetricsMockRecorder struct {
+	mock *Mockmetrics
+}
+
+// NewMockmetrics creates a new mock instance.
+func NewMockmetrics(ctrl *gomock.Controller) *Mockmetrics {
+	mock := &Mockmetrics{ctrl: ctrl}
+	mock.recorder = &MockmetricsMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *Mockmetrics) EXPECT() *MockmetricsMockRecorder {
+	return m.recorder
+}
+
+// IncPositionsSaved mocks base method.
+func (m *Mockmetrics) IncPositionsSaved(ctx context.Context) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "IncPositionsSaved", ctx)
+}
+
+// IncPositionsSaved indicates an expected call of IncPositionsSaved.
+func (mr *MockmetricsMockRecorder) IncPositionsSaved(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncPositionsSaved", reflect.TypeOf((*Mockmetrics)(nil).IncPositionsSaved), ctx)
 }

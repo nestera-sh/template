@@ -69,6 +69,7 @@ func TestRepository_Integration(t *testing.T) {
 
 		got, err := repo.GetByID(ctx, tripID.String())
 		require.NoError(t, err)
+
 		assert.Equal(t, tripID, got.ID)
 		assert.Equal(t, int64(1500), got.Price)
 	})
@@ -84,6 +85,7 @@ func TestRepository_Integration(t *testing.T) {
 			Status:    model.TripStatusActive,
 			StartedAt: time.Now(),
 		}
+
 		err := repo.Save(ctx, tr1)
 		require.NoError(t, err)
 
@@ -95,6 +97,7 @@ func TestRepository_Integration(t *testing.T) {
 			Status:    model.TripStatusActive,
 			StartedAt: time.Now(),
 		}
+
 		err = repo.Save(ctx, tr2)
 
 		require.ErrorIs(t, err, trip.ErrDriverBusy)
@@ -112,6 +115,7 @@ func TestRepository_Integration(t *testing.T) {
 				Status:    model.TripStatusActive,
 				StartedAt: time.Now(),
 			}
+
 			if err := repo.Save(ctx, tr); err != nil {
 				return err
 			}
@@ -124,4 +128,141 @@ func TestRepository_Integration(t *testing.T) {
 		_, err = repo.GetByID(ctx, tripID.String())
 		require.ErrorIs(t, err, trip.ErrTripNotFound)
 	})
+
+	t.Run("GetStaleTrips selects only active without fresh positions", func(t *testing.T) {
+		_, err := pool.Exec(ctx, "TRUNCATE trips CASCADE")
+		require.NoError(t, err)
+
+		now := time.Now().UTC()
+		staleAfter := 60 * time.Second
+
+		stale := &model.Trip{
+			ID:             uuid.New(),
+			UserID:         uuid.New(),
+			DriverID:       uuid.New(),
+			StartLatitude:  59.9,
+			StartLongitude: 30.3,
+			EndLatitude:    59.8,
+			EndLongitude:   30.4,
+			Price:          100,
+			Status:         model.TripStatusActive,
+			StartedAt:      now.Add(-5 * time.Minute),
+		}
+		require.NoError(t, repo.Save(ctx, stale))
+
+		fresh := &model.Trip{
+			ID:             uuid.New(),
+			UserID:         uuid.New(),
+			DriverID:       uuid.New(),
+			StartLatitude:  59.9,
+			StartLongitude: 30.3,
+			EndLatitude:    59.8,
+			EndLongitude:   30.4,
+			Price:          100,
+			Status:         model.TripStatusActive,
+			StartedAt:      now.Add(-5 * time.Minute),
+		}
+		require.NoError(t, repo.Save(ctx, fresh))
+
+		freshPositionTime := now.Add(-10 * time.Second)
+
+		err = txMgr.Do(ctx, func(ctx context.Context) error {
+			return repo.SavePosition(ctx, &model.Position{
+				TripID: fresh.ID,
+				Coordinates: model.Coordinates{
+					Latitude:  59.9,
+					Longitude: 30.3,
+				},
+				RecordedAt: freshPositionTime,
+			})
+		})
+		require.NoError(t, err)
+
+		completed := &model.Trip{
+			ID:             uuid.New(),
+			UserID:         uuid.New(),
+			DriverID:       uuid.New(),
+			StartLatitude:  59.9,
+			StartLongitude: 30.3,
+			EndLatitude:    59.8,
+			EndLongitude:   30.4,
+			Price:          100,
+			Status:         model.TripStatusCompleted,
+			StartedAt:      now.Add(-10 * time.Minute),
+			FinishedAt:     ptrTime(now.Add(-5 * time.Minute)),
+		}
+		require.NoError(t, repo.Save(ctx, completed))
+
+		trips, err := repo.GetStaleTrips(ctx, staleAfter)
+		require.NoError(t, err)
+
+		require.Len(t, trips, 1)
+		assert.Equal(t, stale.ID, trips[0].ID)
+	})
+
+	t.Run("SavePosition does not age trip with older position", func(t *testing.T) {
+		_, _ = pool.Exec(ctx, "TRUNCATE trips CASCADE")
+
+		now := time.Now().UTC()
+
+		tr := &model.Trip{
+			ID:             uuid.New(),
+			UserID:         uuid.New(),
+			DriverID:       uuid.New(),
+			StartLatitude:  59.9,
+			StartLongitude: 30.3,
+			EndLatitude:    59.8,
+			EndLongitude:   30.4,
+			Price:          100,
+			Status:         model.TripStatusActive,
+			StartedAt:      now.Add(-10 * time.Minute),
+		}
+
+		require.NoError(t, repo.Save(ctx, tr))
+
+		freshTime := now.Add(-time.Minute)
+
+		err := txMgr.Do(ctx, func(ctx context.Context) error {
+			return repo.SavePosition(ctx, &model.Position{
+				TripID: tr.ID,
+				Coordinates: model.Coordinates{
+					Latitude:  59.9,
+					Longitude: 30.3,
+				},
+				RecordedAt: freshTime,
+			})
+		})
+
+		require.NoError(t, err)
+
+		got, err := repo.GetByID(ctx, tr.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, got.LastPositionAt)
+
+		assert.WithinDuration(t, freshTime, *got.LastPositionAt, time.Second)
+
+		// Старая координата не должна откатить last_position_at назад.
+		err = txMgr.Do(ctx, func(ctx context.Context) error {
+			return repo.SavePosition(ctx, &model.Position{
+				TripID: tr.ID,
+				Coordinates: model.Coordinates{
+					Latitude:  59.8,
+					Longitude: 30.4,
+				},
+				RecordedAt: now.Add(-5 * time.Minute),
+			})
+		})
+
+		require.NoError(t, err)
+
+		got, err = repo.GetByID(ctx, tr.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, got.LastPositionAt)
+
+		assert.WithinDuration(t, freshTime, *got.LastPositionAt, time.Second)
+	})
+}
+
+func ptrTime(t time.Time) *time.Time {
+	return &t
 }

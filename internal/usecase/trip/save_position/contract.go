@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/nestera-sh/template/internal/model"
 )
 
@@ -12,11 +13,16 @@ import (
 
 type (
 	tripRepository interface {
+		GetByID(ctx context.Context, id string) (*model.Trip, error)
 		SavePosition(ctx context.Context, p *model.Position) error
 	}
 
 	txManager interface {
 		Do(ctx context.Context, fn func(ctx context.Context) error) error
+	}
+
+	metrics interface {
+		IncPositionsSaved(ctx context.Context)
 	}
 )
 

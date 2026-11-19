@@ -3,16 +3,19 @@ package save_position
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/nestera-sh/template/internal/http/domainerror"
-	"github.com/nestera-sh/template/internal/usecase/trip/save_position"
+	"github.com/nestera-sh/template/internal/model"
+	savePositionUC "github.com/nestera-sh/template/internal/usecase/trip/save_position"
 )
 
 type useCase interface {
-	Execute(ctx context.Context, input save_position.Input) error
+	Execute(ctx context.Context, input savePositionUC.Input) (*model.Position, error)
 }
 
 type Handler struct {
@@ -35,30 +38,33 @@ type savePositionRequest struct {
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, tripID string) {
 	uid, err := uuid.Parse(tripID)
 	if err != nil {
-		http.Error(w, "invalid trip id", http.StatusBadRequest)
+		domainerror.WriteInvalidRequest(w, r, "invalid trip id")
 		return
 	}
 
 	var req savePositionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid body", http.StatusBadRequest)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		domainerror.WriteInvalidRequest(w, r, "malformed JSON body")
 		return
 	}
 
 	if req.Coordinates == nil || req.Coordinates.Latitude == nil || req.Coordinates.Longitude == nil || req.RecordedAt == nil {
-		http.Error(w, "missing required fields", http.StatusBadRequest)
+		domainerror.WriteInvalidRequest(w, r, "missing required fields")
 		return
 	}
-	if *req.Coordinates.Latitude < -90 || *req.Coordinates.Latitude > 90 || *req.Coordinates.Longitude < -180 || *req.Coordinates.Longitude > 180 {
-		http.Error(w, "coordinates out of range", http.StatusBadRequest)
+	if *req.Coordinates.Latitude < -90 || *req.Coordinates.Latitude > 90 ||
+		*req.Coordinates.Longitude < -180 || *req.Coordinates.Longitude > 180 {
+		domainerror.WriteInvalidRequest(w, r, "coordinates out of range")
 		return
 	}
 	if req.RecordedAt.After(time.Now().Add(time.Minute)) {
-		http.Error(w, "recorded_at in future", http.StatusBadRequest)
+		domainerror.WriteInvalidRequest(w, r, "recorded_at in future")
 		return
 	}
 
-	err = h.uc.Execute(r.Context(), save_position.Input{
+	pos, err := h.uc.Execute(r.Context(), savePositionUC.Input{
 		TripID:     uid,
 		Latitude:   *req.Coordinates.Latitude,
 		Longitude:  *req.Coordinates.Longitude,
@@ -76,7 +82,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, tripID strin
 		h.onSaved(tripID)
 	}
 
+	resp := struct {
+		ID          int64             `json:"id"`
+		TripID      uuid.UUID         `json:"trip_id"`
+		Coordinates model.Coordinates `json:"coordinates"`
+		RecordedAt  time.Time         `json:"recorded_at"`
+	}{
+		ID:          pos.ID,
+		TripID:      pos.TripID,
+		Coordinates: pos.Coordinates,
+		RecordedAt:  pos.RecordedAt,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "created"})
+	_ = json.NewEncoder(w).Encode(resp)
 }
+
+var _ = errors.Is

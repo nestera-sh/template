@@ -141,25 +141,29 @@ func (r *Repository) SavePosition(ctx context.Context, p *model.Position) error 
 	sqlInsert, argsInsert, err := squirrel.Insert("trip_positions").
 		Columns("trip_id", "latitude", "longitude", "recorded_at").
 		Values(p.TripID, p.Coordinates.Latitude, p.Coordinates.Longitude, p.RecordedAt).
+		Suffix("RETURNING id, created_at").
 		PlaceholderFormat(squirrel.Dollar).
 		ToSql()
 	if err != nil {
 		return fmt.Errorf("build position insert: %w", err)
 	}
 
-	if _, err := q.Exec(ctx, sqlInsert, argsInsert...); err != nil {
+	if err := q.QueryRow(ctx, sqlInsert, argsInsert...).Scan(&p.ID, &p.CreatedAt); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return domainTrip.ErrTripNotFound
+		}
 		return fmt.Errorf("insert position: %w", err)
 	}
 
 	sqlUpdate := `
-		UPDATE trips 
-		SET last_position_at = $1, updated_at = now() 
-		WHERE id = $2 
-		  AND status = 'active' 
+		UPDATE trips
+		SET last_position_at = $1, updated_at = now()
+		WHERE id = $2
+		  AND status = 'active'
 		  AND (last_position_at IS NULL OR last_position_at < $1)
 	`
-	_, err = q.Exec(ctx, sqlUpdate, p.RecordedAt, p.TripID)
-	if err != nil {
+	if _, err := q.Exec(ctx, sqlUpdate, p.RecordedAt, p.TripID); err != nil {
 		return fmt.Errorf("update last_position_at: %w", err)
 	}
 

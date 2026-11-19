@@ -1,6 +1,7 @@
 package domainerror
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -46,3 +47,16 @@ func Problem(err error) (int, api.Problem) {
 }
 
 func stringPtr(s string) *string { return &s }
+
+func WriteInvalidRequest(w http.ResponseWriter, r *http.Request, detail string) {
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(http.StatusBadRequest)
+	_ = json.NewEncoder(w).Encode(api.Problem{
+		Type:     "https://tripgo.example/problems/invalid-request",
+		Title:    "Invalid request",
+		Status:   http.StatusBadRequest,
+		Code:     "invalid_request",
+		Detail:   stringPtr(detail),
+		Instance: stringPtr(r.URL.Path),
+	})
+}
