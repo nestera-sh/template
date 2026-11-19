@@ -241,7 +241,6 @@ func TestRepository_Integration(t *testing.T) {
 
 		assert.WithinDuration(t, freshTime, *got.LastPositionAt, time.Second)
 
-		// Старая координата не должна откатить last_position_at назад.
 		err = txMgr.Do(ctx, func(ctx context.Context) error {
 			return repo.SavePosition(ctx, &model.Position{
 				TripID: tr.ID,

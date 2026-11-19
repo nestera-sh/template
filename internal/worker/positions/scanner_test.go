@@ -287,7 +287,6 @@ func TestScanner_CancelTaskSkipsPush(t *testing.T) {
 
 	receive(t, pusher.started)
 
-	// Ждём, пока обе задачи окажутся в очереди.
 	for i := 0; i < 2; i++ {
 		select {
 		case result := <-metrics.staleResults:
@@ -297,7 +296,6 @@ func TestScanner_CancelTaskSkipsPush(t *testing.T) {
 		}
 	}
 
-	// Отменяем вторую задачу до её обработки воркером.
 	s.CancelTask(secondTrip.ID.String())
 
 	close(block)
