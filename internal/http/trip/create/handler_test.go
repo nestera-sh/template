@@ -18,22 +18,23 @@ import (
 )
 
 const (
-	fieldUserID    = "user_id"
-	fieldDriverID  = "driver_id"
-	fieldLongitude = "longitude"
-	testUserID     = "11111111-1111-1111-1111-111111111111"
-	testDriverID   = "22222222-2222-2222-2222-222222222222"
-	fieldLatitude  = "latitude"
-	fieldEndPoint  = "end_point"
+	fieldUserID     = "user_id"
+	fieldDriverID   = "driver_id"
+	fieldLongitude  = "longitude"
+	testUserID      = "11111111-1111-1111-1111-111111111111"
+	testDriverID    = "22222222-2222-2222-2222-222222222222"
+	fieldStartPoint = "start_point"
+	fieldLatitude   = "latitude"
+	fieldEndPoint   = "end_point"
 )
 
 func TestHandler_ServeHTTP(t *testing.T) {
 	validBody := map[string]interface{}{
-		fieldUserID:   testUserID,
-		fieldDriverID: testDriverID,
-		"start_point": map[string]float64{fieldLatitude: 10, fieldLongitude: 20},
-		fieldEndPoint: map[string]float64{fieldLatitude: 30, fieldLongitude: 40},
-		"price":       1000,
+		fieldUserID:     testUserID,
+		fieldDriverID:   testDriverID,
+		fieldStartPoint: map[string]float64{fieldLatitude: 10, fieldLongitude: 20},
+		fieldEndPoint:   map[string]float64{fieldLatitude: 30, fieldLongitude: 40},
+		"price":         1000,
 	}
 
 	tests := []struct {
@@ -59,22 +60,22 @@ func TestHandler_ServeHTTP(t *testing.T) {
 		{
 			name: "missing required field (price)",
 			body: map[string]interface{}{
-				fieldUserID:   testUserID,
-				fieldDriverID: testDriverID,
-				"start_point": map[string]float64{fieldLatitude: 10, fieldLongitude: 20},
-				fieldEndPoint: map[string]float64{fieldLatitude: 30, fieldLongitude: 40},
+				fieldUserID:     testUserID,
+				fieldDriverID:   testDriverID,
+				fieldStartPoint: map[string]float64{fieldLatitude: 10, fieldLongitude: 20},
+				fieldEndPoint:   map[string]float64{fieldLatitude: 30, fieldLongitude: 40},
 			},
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name: "unknown field",
 			body: map[string]interface{}{
-				fieldUserID:   testUserID,
-				fieldDriverID: testDriverID,
-				"start_point": map[string]float64{fieldLatitude: 10, fieldLongitude: 20},
-				fieldEndPoint: map[string]float64{fieldLatitude: 30, fieldLongitude: 40},
-				"price":       1000,
-				"unknown":     "field",
+				fieldUserID:     testUserID,
+				fieldDriverID:   testDriverID,
+				fieldStartPoint: map[string]float64{fieldLatitude: 10, fieldLongitude: 20},
+				fieldEndPoint:   map[string]float64{fieldLatitude: 30, fieldLongitude: 40},
+				"price":         1000,
+				"unknown":       "field",
 			},
 			wantStatus: http.StatusBadRequest,
 		},
